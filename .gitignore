@@ -1,0 +1,26 @@
+# Generated screenshots, renders and logs
+renders/
+*.log
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Headless-Chrome profile directories created by screenshot runs
+.chrome_p*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor folders and swap files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

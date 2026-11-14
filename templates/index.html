@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>BattleBot Designer | Combat Robot Design Studio &amp; Factory Floor</title>
+  <link rel="stylesheet" href="/static/bb.css?v=43" />
+  <link rel="stylesheet" href="/static/bb_arena.css?v=43" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <div id="vignette"></div>
+    <svg id="callout-svg" viewBox="0 0 1600 900"></svg>
+    <div id="callouts-layer"></div>
+
+    <div class="hud-layer" id="hud-root">
+      <header class="top-bar">
+        <div class="brand-box" id="brand-box" title="Open the garage">
+          <svg width="42" height="42" viewBox="0 0 44 44" fill="none" stroke="#0b0c0f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="18" width="26" height="12" rx="1.5"/><circle cx="14" cy="32" r="3.5"/><circle cx="30" cy="32" r="3.5"/>
+            <circle cx="33" cy="13" r="6"/><path d="M33 7v3M33 16v3M27 13h3M36 13h3"/>
+          </svg>
+          <span class="brand-code">BBD</span>
+        </div>
+        <div class="title-block">
+          <div class="eyebrow" id="hdr-eyebrow">BATTLEBOT DESIGNER · 250 LB CLASS</div>
+          <div class="main-title" id="hdr-title-wrap" title="Click to rename this build"><span id="hdr-title">UNIT 01</span><span class="slash">/</span></div>
+          <div class="sub-title" id="hdr-subtitle">—</div>
+        </div>
+        <div class="mode-switch" id="mode-switch">
+          <button class="mode-btn active" data-mode="studio"><b>STUDIO</b><span>DESIGN · TEST</span></button>
+          <button class="mode-btn" data-mode="factory"><b>FACTORY</b><span>PIECE BY PIECE</span></button>
+          <button class="mode-btn" data-mode="arena"><b>ARENA</b><span>FIGHT A MATCH</span></button>
+        </div>
+        <div class="load-meter">
+          <div class="load-head"><span id="load-title">WEIGHT BUDGET</span><b id="load-pct">0.0 / 250 LB</b></div>
+          <div class="load-ticks" id="load-ticks"></div>
+          <div class="load-foot"><span>0</span><span id="load-mid">125 LB</span><span id="load-max">250 LB LIMIT</span></div>
+        </div>
+        <div class="meta-strip">
+          <div class="meta-col"><span class="meta-k">RENDERER</span><span class="meta-v" id="meta-renderer">—</span></div>
+          <div class="meta-col"><span class="meta-k">CHECKS</span><span class="meta-v" id="meta-checks">0 / 0</span></div>
+          <div class="meta-col"><span class="meta-k">STATUS</span><span class="meta-v"><i class="status-dot" id="meta-status-dot"></i><span id="meta-status">LEGAL</span></span></div>
+        </div>
+      </header>
+
+      <!-- PANEL 01: BUILD CONFIGURATOR / FACTORY STATION -->
+      <section class="panel" id="panel-build" style="left:20px;top:104px;width:392px;height:782px">
+        <div class="p-head"><div class="p-head-left"><i class="p-bar"></i><span id="build-title">BUILD</span></div><span class="p-num" id="build-num">01</span></div>
+        <div class="cfg-tabs" id="cfg-tabs"></div>
+        <div class="station-rail" id="station-rail"></div>
+        <div class="cfg-body" id="cfg-body"></div>
+        <div class="station-nav" id="station-nav">
+          <button class="sim-btn" id="st-prev">◀ BACK</button>
+          <button class="sim-btn" id="st-new">NEW BUILD</button>
+          <button class="sim-btn hot" id="st-next">NEXT STATION ▶</button>
+        </div>
+      </section>
+
+      <!-- LAB BAR + TEST BAR -->
+      <div class="lab-bar" id="lab-bar">
+        <div class="lab-group">
+          <button class="sim-btn" id="v-labels">LABELS</button>
+          <button class="sim-btn" id="v-xray">X-RAY</button>
+          <button class="sim-btn" id="v-elec">ELECTRICAL</button>
+          <button class="sim-btn" id="v-thermal">THERMAL</button>
+          <button class="sim-btn" id="v-cg">CG</button>
+          <button class="sim-btn" id="v-invert">INVERT</button>
+          <button class="sim-btn" id="v-turn">TURNTABLE</button>
+        </div>
+        <label>TEARDOWN <input type="range" id="v-teardown" min="0" max="100" value="0" /></label>
+      </div>
+      <div class="test-bar" id="test-bar"></div>
+
+      <div class="mode-banner">
+        <div class="mode-eyebrow" id="mode-eyebrow">TEST STAND</div>
+        <div class="mode-big" id="mode-big">SAFE</div>
+        <div class="mode-sub" id="mode-sub">MASTER SWITCH ON · ALL SYSTEMS AT REST</div>
+      </div>
+
+      <!-- PANEL 02: SELECTED MODULE -->
+      <section class="panel" style="left:1188px;top:104px;width:392px;height:292px">
+        <div class="p-head"><div class="p-head-left"><i class="p-bar"></i><span id="w-title">MODULE</span></div><span class="p-num">02</span></div>
+        <div class="slot-chips" id="w-chips"></div>
+        <div class="hero-row">
+          <div><div class="val-lg"><span id="w-hero">0</span><small id="w-hero-unit">KJ</small></div><div class="lbl" id="w-hero-lbl">—</div></div>
+          <svg id="w-chart" width="150" height="56" style="overflow:visible;margin-bottom:16px;flex:none"></svg>
+        </div>
+        <div class="kv" id="w-rows"></div>
+      </section>
+
+      <!-- PANEL 03: SYSTEMS (electrical / drive, one at a time so the rows stay readable) -->
+      <section class="panel" style="left:1188px;top:406px;width:392px;height:220px">
+        <div class="p-head"><div class="p-head-left"><i class="p-bar"></i><span id="sys-title">ELECTRICAL</span></div>
+          <div class="sys-tabs" id="sys-tabs"><button class="sys-tab active" data-sys="elec">ELECTRICAL</button><button class="sys-tab" data-sys="drive">DRIVE</button></div></div>
+        <div class="kv" id="e-rows"></div>
+        <div class="kv" id="d-rows" style="display:none"></div>
+      </section>
+
+      <!-- PANEL 05: ENGINEERING CHECKS -->
+      <section class="panel" style="left:1188px;top:636px;width:392px;height:250px">
+        <div class="p-head"><div class="p-head-left"><i class="p-bar"></i><span>CHECKS</span></div><span class="pill green" id="checks-summary">ALL PASS</span></div>
+        <div class="checks-list" id="checks-list"></div>
+      </section>
+
+      <!-- PANEL 06: MASS BUDGET + ACTIONS -->
+      <section class="panel" style="left:424px;top:774px;width:752px;height:112px">
+        <div class="p-head"><div class="p-head-left"><i class="p-bar"></i><span>MASS BUDGET</span></div><span class="p-num">06</span></div>
+        <div class="mass-row">
+          <div class="mass-bar-wrap"><div class="mass-bar" id="mass-bar"></div><div class="mass-limit" id="mass-limit"></div></div>
+          <div class="action-btns">
+            <button class="sim-btn" id="b-garage">GARAGE</button>
+            <button class="sim-btn" id="b-save">SAVE</button>
+            <button class="sim-btn" id="b-undo" title="Undo (Ctrl+Z)">↶ UNDO</button>
+            <button class="sim-btn" id="b-redo" title="Redo (Ctrl+Y)">REDO ↷</button>
+            <button class="sim-btn" id="b-bom">PARTS + COST</button>
+            <button class="sim-btn" id="b-tools">MORE ▾</button>
+          </div>
+        </div>
+        <div class="mass-legend" id="mass-legend"></div>
+      </section>
+
+      <div class="inspect-card" id="inspect-card"></div>
+      <div class="popover" id="garage-pop"></div>
+      <div class="popover tools-pop" id="tools-pop">
+        <button class="opt" id="b-share"><span class="opt-name">SHARE / IMPORT</span><span class="opt-spec">LINK OR FILE · LOAD A BUILD SOMEONE SENT YOU</span></button>
+        <button class="opt" id="b-compare"><span class="opt-name">COMPARE BUILDS</span><span class="opt-spec">THIS BUILD SIDE BY SIDE WITH ANOTHER</span></button>
+        <button class="opt" id="b-random"><span class="opt-name">SURPRISE ME</span><span class="opt-spec">A RANDOM BUILD THAT PASSES THE CHECKS</span></button>
+        <button class="opt" id="b-tape"><span class="opt-name">TALE OF THE TAPE</span><span class="opt-spec">STAT CARD WITH A RENDER · PNG</span></button>
+        <button class="opt" id="b-spec"><span class="opt-name">SPEC SHEET</span><span class="opt-spec">PRINTABLE PAGE: STATS, CHECKS, PARTS</span></button>
+        <button class="opt" id="b-snap"><span class="opt-name">SNAPSHOT</span><span class="opt-spec">SAVE THE CURRENT VIEW · PNG</span></button>
+        <button class="opt" id="b-about"><span class="opt-name">ABOUT</span><span class="opt-spec">VERSION · MODEL LIMITS · KEYS</span></button>
+      </div>
+
+      <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+          <div class="modal-head"><h3 id="modal-title">PARTS LIST</h3><div class="action-btns" id="modal-actions"></div></div>
+          <div class="modal-body" id="modal-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/three.min.js"></script>
+  <script src="/static/bb_physics.js?v=43"></script>
+  <script src="/static/bb_engine.js?v=43"></script>
+  <script src="/static/bb_kit.js?v=43"></script>
+  <script src="/static/bb_modules.js?v=43"></script>
+  <script src="/static/bb_models.js?v=43"></script>
+  <script src="/static/bb_arena.js?v=43"></script>
+  <script src="/static/bb_app.js?v=43"></script>
+</body>
+</html>

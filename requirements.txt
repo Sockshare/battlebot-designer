@@ -1,0 +1,3 @@
+# Runtime dependency of server.py (its only third-party import is flask).
+# Flask pulls in Werkzeug, Jinja2, MarkupSafe, itsdangerous, click and blinker.
+Flask>=3.0,<4

@@ -1556,6 +1556,10 @@
   let camReady = false; // first frame snaps to the framed view instead of easing in
   function tick(nowMs) {
     requestAnimationFrame(tick);
+    if (window.BBArena && window.BBArena.isOpen()) {
+      last = nowMs * 0.001;
+      return;
+    }
     const now = nowMs * 0.001;
     const dt = Math.min(0.05, Math.max(0.001, now - last));
     last = now;

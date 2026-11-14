@@ -1493,9 +1493,365 @@
       }
     }
 
+    // ---- 3D BattleBox Arena Scene & 3D Bot Poser ----------------------------------------------------
+    function ensureArena3D() {
+      const E = root.BBEngine, Mdl = root.BBModels;
+      if (!E || !Mdl) return null;
+      if (ui.scn3d) return ui.scn3d;
+      const THREE = E.THREE;
+      const scn = new THREE.Scene();
+      scn.background = new THREE.Color('#07090d');
+      if (E.scene && E.scene.environment) scn.environment = E.scene.environment;
+
+      scn.add(new THREE.HemisphereLight('#dce8ff', '#14171f', 0.68));
+      const key = new THREE.DirectionalLight('#fff8eb', 1.75);
+      key.position.set(-7, 15, 8);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      Object.assign(key.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 2, far: 38 });
+      key.shadow.bias = -0.001;
+      scn.add(key);
+
+      const fill = new THREE.DirectionalLight('#6eb4ff', 0.72);
+      fill.position.set(10, 9, 7);
+      scn.add(fill);
+
+      const rim = new THREE.DirectionalLight('#ff7438', 0.92);
+      rim.position.set(4, 8, -11);
+      scn.add(rim);
+
+      const cam = new THREE.PerspectiveCamera(34, STAGE_W / STAGE_H, 0.2, 120);
+      const S = Mdl.SCALE || 2; // 1 arena metre = 2 scene units; 10x10m arena = [-10, 10] in X and Z
+
+      const setGrp = new THREE.Group();
+      setGrp.userData.isSet = true;
+      scn.add(setGrp);
+
+      // 10m x 10m AR500 BattleBox Steel Deck (5x5 2m plates with bevel seams, bolt rows, and starting squares)
+      const plateMatA = new THREE.MeshStandardMaterial({ color: '#242932', roughness: 0.30, metalness: 0.90 });
+      const plateMatB = new THREE.MeshStandardMaterial({ color: '#1f242c', roughness: 0.34, metalness: 0.88 });
+      const seamMat = new THREE.MeshStandardMaterial({ color: '#0c0e12', roughness: 0.55, metalness: 0.6 });
+      const boltMat = new THREE.MeshStandardMaterial({ color: '#8f98a6', roughness: 0.22, metalness: 0.98 });
+      for (let ix = 0; ix < 5; ix++) {
+        for (let iz = 0; iz < 5; iz++) {
+          const px = (-4 + ix * 2) * S, pz = (-4 + iz * 2) * S;
+          const pm = new THREE.Mesh(new THREE.BoxGeometry(1.97 * S, 0.08, 1.97 * S), (ix + iz) % 2 ? plateMatA : plateMatB);
+          pm.position.set(px, -0.04, pz);
+          pm.receiveShadow = true;
+          setGrp.add(pm);
+          // Corner plate bolts
+          for (const bx of [-0.88, 0.88]) for (const bz of [-0.88, 0.88]) {
+            const bm = new THREE.Mesh(new THREE.BoxGeometry(0.035 * S, 0.015, 0.035 * S), boltMat);
+            bm.position.set(px + bx * S, 0.004, pz + bz * S);
+            setGrp.add(bm);
+          }
+        }
+      }
+      const underFloor = new THREE.Mesh(new THREE.BoxGeometry(10.6 * S, 0.1, 10.6 * S), seamMat);
+      underFloor.position.set(0, -0.095, 0);
+      setGrp.add(underFloor);
+
+      // Starting squares (Orange Red Left at x=-3.3m, Electric Blue Right at x=+3.3m) & Center BattleBox Ring
+      const mkBoxFrame = (cx, cz, half, w, colHex) => {
+        const mat = new THREE.MeshBasicMaterial({ color: colHex });
+        for (const s of [-1, 1]) {
+          const h1 = new THREE.Mesh(new THREE.BoxGeometry(half * 2, 0.014, w), mat);
+          h1.position.set(cx, 0.007, cz + s * half);
+          const h2 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.014, half * 2), mat);
+          h2.position.set(cx + s * half, 0.007, cz);
+          setGrp.add(h1, h2);
+        }
+      };
+      mkBoxFrame(-3.3 * S, 0, 0.78 * S, 0.055 * S, '#ff5a1f');
+      mkBoxFrame(3.3 * S, 0, 0.78 * S, 0.055 * S, '#3aa0ff');
+
+      const ringGeo = new THREE.RingGeometry(1.08 * S, 1.16 * S, 48);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ff5a1f', side: THREE.DoubleSide, transparent: true, opacity: 0.45 }));
+      ringMesh.position.y = 0.007;
+      setGrp.add(ringMesh);
+      const innerRingGeo = new THREE.RingGeometry(0.32 * S, 0.36 * S, 36);
+      innerRingGeo.rotateX(-Math.PI / 2);
+      const innerRingMesh = new THREE.Mesh(innerRingGeo, new THREE.MeshBasicMaterial({ color: '#94a3b8', side: THREE.DoubleSide, transparent: true, opacity: 0.35 }));
+      innerRingMesh.position.y = 0.007;
+      setGrp.add(innerRingMesh);
+
+      // Perimeter Steel Kick-Plates, Hazard Stripes, Steel Stanchion Posts, and Overhead Light Truss
+      const kickMat = new THREE.MeshStandardMaterial({ color: '#1b1f26', roughness: 0.35, metalness: 0.92 });
+      const stripeYel = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.32, metalness: 0.35 });
+      const postMat = new THREE.MeshStandardMaterial({ color: '#38404d', roughness: 0.28, metalness: 0.94 });
+      const lightStripMat = new THREE.MeshBasicMaterial({ color: '#fff8eb' });
+      const glassMat = new THREE.MeshBasicMaterial({ color: '#7dd3fc', transparent: true, opacity: 0.06, depthWrite: false });
+      const W_HALF = ARENA * S; // 10 units
+
+      for (const side of [-1, 1]) {
+        // North & South kick plates + top truss beams
+        const kwZ = new THREE.Mesh(new THREE.BoxGeometry(W_HALF * 2 + 0.4, 0.56, 0.24), kickMat);
+        kwZ.position.set(0, 0.28, side * (W_HALF + 0.12));
+        const kwX = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.56, W_HALF * 2 + 0.4), kickMat);
+        kwX.position.set(side * (W_HALF + 0.12), 0.28, 0);
+        const stZ = new THREE.Mesh(new THREE.BoxGeometry(W_HALF * 2, 0.12, 0.26), stripeYel);
+        stZ.position.set(0, 0.50, side * (W_HALF + 0.12));
+        const stX = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, W_HALF * 2), stripeYel);
+        stX.position.set(side * (W_HALF + 0.12), 0.50, 0);
+        setGrp.add(kwZ, kwX, stZ, stX);
+      }
+      // Back & side Lexan shield panels + corner steel towers + glowing stadium light pods
+      const backGlass = new THREE.Mesh(new THREE.PlaneGeometry(W_HALF * 2, 3.6), glassMat);
+      backGlass.position.set(0, 2.3, -W_HALF - 0.08);
+      setGrp.add(backGlass);
+      const topBeam = new THREE.Mesh(new THREE.BoxGeometry(W_HALF * 2 + 0.5, 0.22, 0.22), postMat);
+      topBeam.position.set(0, 3.9, -W_HALF - 0.12);
+      setGrp.add(topBeam);
+      for (let i = -5; i <= 5; i += 2) {
+        if (Math.abs(i) <= 3) {
+          const lPod = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.18), lightStripMat);
+          lPod.position.set(i * S, 3.75, -W_HALF - 0.02);
+          setGrp.add(lPod);
+        }
+        for (const s of [-1, 1]) {
+          const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.9, 0.18), postMat);
+          p1.position.set(i * S, 1.95, -W_HALF - 0.12);
+          const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.9, 0.18), postMat);
+          p2.position.set(s * (W_HALF + 0.12), 1.95, i * S);
+          setGrp.add(p1, p2);
+        }
+      }
+
+      // Dynamic 3D Hazards Group (Kill Saws, Pulverizer Hammer, Wall Screws, Pit, Flame Jets)
+      const hzGrp = new THREE.Group();
+      scn.add(hzGrp);
+      const sawMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughness: 0.12, metalness: 1.0 });
+      const sawSlotMat = new THREE.MeshBasicMaterial({ color: '#050608' });
+      const saws3d = [0, 1, 2, 3].map(() => {
+        const g = new THREE.Group();
+        const chev = new THREE.Mesh(new THREE.BoxGeometry(0.32 * S, 0.012, 1.24 * S), stripeYel);
+        chev.position.y = 0.006;
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.14 * S, 0.018, 1.1 * S), sawSlotMat);
+        slot.position.y = 0.009;
+        const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.45 * S, 0.45 * S, 0.035, 24), sawMat);
+        blade.rotation.z = Math.PI / 2;
+        g.add(chev, slot, blade);
+        hzGrp.add(g);
+        return { g, blade };
+      });
+
+      const pitGrp = new THREE.Group();
+      const pitRim = new THREE.Mesh(new THREE.BoxGeometry(1.65 * S, 0.02, 1.65 * S), stripeYel);
+      pitRim.position.y = 0.005;
+      const pitHole = new THREE.Mesh(new THREE.BoxGeometry(1.42 * S, 0.03, 1.42 * S), sawSlotMat);
+      pitHole.position.y = 0.008;
+      const pitLid = new THREE.Mesh(new THREE.BoxGeometry(1.4 * S, 0.04, 1.4 * S), plateMatA);
+      pitLid.position.y = 0.02;
+      pitGrp.add(pitRim, pitHole, pitLid);
+      hzGrp.add(pitGrp);
+
+      const pulvGrp = new THREE.Group();
+      const pulvPivot = new THREE.Group();
+      const pulvArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.7 * S), postMat);
+      pulvArm.position.set(0, 0, 0.85 * S);
+      const pulvHead = new THREE.Mesh(new THREE.BoxGeometry(0.56 * S, 0.48 * S, 0.56 * S), new THREE.MeshStandardMaterial({ color: '#dc2626', roughness: 0.25, metalness: 0.78 }));
+      pulvHead.position.set(0, -0.15, 1.65 * S);
+      pulvPivot.add(pulvArm, pulvHead);
+      pulvGrp.add(pulvPivot);
+      hzGrp.add(pulvGrp);
+
+      const screwGrp = new THREE.Group();
+      const screwCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * S, 0.18 * S, 4.4 * S, 18), sawMat);
+      screwCyl.rotation.z = Math.PI / 2;
+      screwGrp.add(screwCyl);
+      hzGrp.add(screwGrp);
+
+      ui.scn3d = { scn, cam, key, S, saws3d, pitGrp, pitLid, pulvGrp, pulvPivot, screwGrp, screwCyl, bots3d: [null, null], botBuilds: [null, null] };
+      return ui.scn3d;
+    }
+
+    function syncArenaBots3D(b0, b1) {
+      const s3 = ensureArena3D();
+      if (!s3) return;
+      const Mdl = root.BBModels;
+      [b0, b1].forEach((b, i) => {
+        if (s3.botBuilds[i] === b && s3.bots3d[i]) return;
+        if (s3.bots3d[i]) {
+          s3.scn.remove(s3.bots3d[i].root);
+          Mdl.disposeBot(s3.bots3d[i]);
+        }
+        s3.bots3d[i] = Mdl.buildBot(b);
+        s3.botBuilds[i] = b;
+        s3.scn.add(s3.bots3d[i].root);
+      });
+    }
+
+    function poseArenaBot3D(model, build, spec, bs, t) {
+      const a = model.anim, S = model.scale;
+      // Map Arena (bs.x, bs.y, bs.th) -> 3D World (X = bs.x * S, Z = bs.y * S, rotY = Math.PI/2 - (bs.th + bs.body))
+      const invF = bs.inv ? 1 : 0;
+      const liftY = Math.max(0, bs.air) * 0.85 + (invF ? build.invertRest : 0);
+      model.root.position.set(bs.x * S, liftY * S, bs.y * S);
+      model.root.rotation.order = 'YXZ';
+      model.root.rotation.y = Math.PI / 2 - (bs.th + bs.body);
+      model.root.rotation.z = Math.PI * invF;
+      model.root.rotation.x = 0;
+      model.root.visible = !bs.out;
+
+      const moving = clamp(bs.speed / Math.max(0.5, spec.topSpeed), 0, 1);
+      const wheelAng = t * moving * 18;
+      for (const w of a.wheelsL) w.rotation.x = wheelAng;
+      for (const w of a.wheelsR) w.rotation.x = wheelAng;
+      for (const c of a.driveCans) c.mesh.rotation.x = wheelAng * 3;
+      if (a.legs) for (const l of a.legs) l.set(t * 2.2, moving);
+
+      spec.weapons.forEach((w, k) => {
+        const ws = bs.w[k] || { spin: 0, ang: 0, anim: 0, act: 0 };
+        const h = a.slots[w.slot];
+        if (!h) return;
+        if (h.rotor) h.rotor(ws.ang || t * ws.spin * 28);
+        if (h.cans) h.cans((ws.ang || 0) * 3);
+        if (h.blur) h.blur(ws.spin > 0.35);
+        if (h.pose) h.pose(clamp(ws.anim || 0, 0, 1));
+        if (h.fx) h.fx(ws.act > 0 ? 1 : 0, t, ws.anim || 0);
+      });
+    }
+
+    function projectArena3D(s3, wx, wy, wz) {
+      const THREE = root.BBEngine.THREE;
+      const v = new THREE.Vector3(wx * s3.S, wy * s3.S, wz * s3.S);
+      v.project(s3.cam);
+      return { x: (v.x * 0.5 + 0.5) * STAGE_W, y: (-v.y * 0.5 + 0.5) * STAGE_H, behind: v.z > 1 };
+    }
+
     // ---- frame --------------------------------------------------------------------------------------
     function render(view, t) {
       const g = ui.ctx, m = ui.match, k = m.bots[0].spec.k;
+      const E = root.BBEngine, s3 = ui.camMode !== '2d' ? ensureArena3D() : null;
+
+      if (s3 && E && E.renderer) {
+        syncArenaBots3D(m.bots[0].build || ui.opts.build, m.bots[1].build);
+        for (let i = 0; i < 2; i++) {
+          poseArenaBot3D(s3.bots3d[i], m.bots[i].build || ui.opts.build, m.bots[i].spec, view.bots[i], t);
+        }
+        // Pose 3D Hazards
+        const S = s3.S, hz = m.hz, hs = view.hz;
+        s3.saws3d.forEach((sw, idx) => {
+          const def = hz.saws[idx];
+          if (!def) { sw.g.visible = false; return; }
+          sw.g.visible = true;
+          const up = hs.saws[idx] || 0;
+          sw.g.position.set(def.x * S, 0, def.y * S);
+          sw.blade.position.y = (-0.42 + up * 0.65) * S;
+          sw.blade.rotation.x = t * 32;
+        });
+        if (hz.pit) {
+          s3.pitGrp.visible = true;
+          s3.pitGrp.position.set(hz.pit.x * S, 0, hz.pit.y * S);
+          s3.pitLid.position.y = (0.02 - (hs.pit || 0) * 0.65) * S;
+        } else s3.pitGrp.visible = false;
+
+        if (hz.pulv) {
+          s3.pulvGrp.visible = true;
+          s3.pulvGrp.position.set(-4.8 * S, 1.35 * S, -4.8 * S);
+          s3.pulvGrp.rotation.y = Math.atan2(hz.pulv.x + 4.8, hz.pulv.y + 4.8);
+          s3.pulvPivot.rotation.x = (hs.pulv || 0) * 0.62;
+        } else s3.pulvGrp.visible = false;
+
+        if (hz.screws) {
+          s3.screwGrp.visible = true;
+          s3.screwGrp.position.set(0, 0.22 * S, 4.85 * S);
+          s3.screwCyl.rotation.x = t * 8;
+        } else s3.screwGrp.visible = false;
+
+        // Position 3D Camera based on ui.camMode ('broadcast', 'chase', 'top3d')
+        const b0 = view.bots[0], b1 = view.bots[1];
+        const sh = shakeAt(m.events, t);
+        const midX = ((b0.x + b1.x) * 0.5) * S, midZ = ((b0.y + b1.y) * 0.5) * S;
+        const distBots = Math.hypot(b0.x - b1.x, b0.y - b1.y) * S;
+        if (ui.camMode === 'chase') {
+          const c = Math.cos(b0.th), s = Math.sin(b0.th);
+          s3.cam.position.set((b0.x - c * 2.9) * S + sh[0] * 0.02, 2.15 * S, (b0.y - s * 2.9) * S + sh[1] * 0.02);
+          s3.cam.lookAt((b0.x + c * 1.8) * S, 0.25 * S, (b0.y + s * 1.8) * S);
+        } else if (ui.camMode === 'top3d') {
+          s3.cam.position.set(midX * 0.2 + sh[0] * 0.02, 23.5, midZ * 0.2 + 5.2 + sh[1] * 0.02);
+          s3.cam.lookAt(midX * 0.2, 0, midZ * 0.2);
+        } else {
+          // 'broadcast' dynamic stadium camera keeping both bots framed cleanly inside the central arena viewport
+          const zoomDist = clamp(14.5 + distBots * 0.72, 14.5, 24.5);
+          s3.cam.position.set(midX * 0.42 + sh[0] * 0.025, zoomDist * 0.68, midZ * 0.42 + zoomDist * 0.92 + sh[1] * 0.025);
+          s3.cam.lookAt(midX * 0.52, 0.15 * S, midZ * 0.52);
+        }
+        s3.cam.updateMatrixWorld(true);
+        if (E.invalidate) E.invalidate();
+        E.renderer.render(s3.scn, s3.cam);
+
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.clearRect(0, 0, STAGE_W, STAGE_H);
+        g.globalAlpha = 1;
+        g.globalCompositeOperation = 'source-over';
+        g.drawImage(E.canvas, 0, 0, STAGE_W, STAGE_H);
+
+        // Draw 3D-projected sparks, flames, damage numbers, and YOU/CPU floating badges
+        const ev = m.events;
+        for (let i = eventIndex(ev, t) - 1; i >= 0 && t - ev[i].t < 1.3; i--) {
+          const e = ev[i], age = t - e.t;
+          const pt = projectArena3D(s3, e.x, 0.25, e.y);
+          if (pt.behind) continue;
+          if (e.type === 'hit' && age < 0.65) {
+            const nSpark = Math.round(clamp(e.dmg / 400, 10, 52)), life = 0.65, fade = 1 - age / life;
+            g.globalCompositeOperation = 'lighter'; g.lineCap = 'round';
+            for (let q = 0; q < nSpark; q++) {
+              const a = hash(i * 131 + q, 1) * TAU, sp = 90 + hash(i * 131 + q, 2) * 380, d = sp * age * (1 - age * 0.6);
+              const sx0 = pt.x + Math.cos(a) * d, sy0 = pt.y + Math.sin(a) * d * 0.65 - 90 * age + 180 * age * age;
+              line(g, sx0, sy0, sx0 + Math.cos(a) * (8 + sp * 0.04), sy0 + Math.sin(a) * (6 + sp * 0.03) + 12 * age, 2.2, `rgba(255,${Math.round(160 + 95 * fade)},${Math.round(60 + 160 * fade * hash(q, i))},${fade})`);
+            }
+            if (age < 0.12) {
+              const r = 24 + Math.sqrt(e.dmg) * 0.6;
+              const fg = g.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r);
+              fg.addColorStop(0, 'rgba(255,255,245,0.98)'); fg.addColorStop(0.5, 'rgba(255,160,50,0.55)'); fg.addColorStop(1, 'rgba(255,90,20,0)');
+              disc(g, pt.x, pt.y, r, fg);
+            }
+            g.globalCompositeOperation = 'source-over';
+            if (e.dmg >= 3500 && age < 1.1) {
+              g.globalAlpha = clamp(2 - age * 2, 0, 1); g.font = '800 22px "JetBrains Mono", monospace'; g.textAlign = 'center';
+              g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,0.9)'; g.fillStyle = e.to === 0 ? '#ff9a73' : '#ffe9a8';
+              const txt = scaled(`${(e.dmg / 1000).toFixed(1)} KJ`, k);
+              g.strokeText(txt, pt.x, pt.y - 28 - age * 42); g.fillText(txt, pt.x, pt.y - 28 - age * 42); g.globalAlpha = 1;
+            }
+          } else if (e.type === 'breach' && age < 1.3) {
+            g.globalAlpha = clamp(1.6 - age * 1.4, 0, 1); g.font = '900 24px Inter, sans-serif'; g.textAlign = 'center'; g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.9)'; g.fillStyle = '#ff4433';
+            g.strokeText('ARMOUR BREACHED!', pt.x, pt.y - 48 - age * 24); g.fillText('ARMOUR BREACHED!', pt.x, pt.y - 48 - age * 24); g.globalAlpha = 1;
+          }
+        }
+        // Flame jets in 3D view
+        hz.flames.forEach((f, idx) => {
+          if (!hs.flames[idx]) return;
+          const fp = projectArena3D(s3, f.x, 0.1, f.y);
+          if (fp.behind) return;
+          g.globalCompositeOperation = 'lighter';
+          for (let q = 0; q < 14; q++) {
+            const u = frac(q / 14 + t * 2.5);
+            disc(g, fp.x + (hash(q, idx) - 0.5) * 28 * u, fp.y - u * 95, 10 + u * 28, `rgba(255,${Math.round(220 - 150 * u)},${Math.round(80 * (1 - u))},${0.55 * (1 - u)})`);
+          }
+          g.globalCompositeOperation = 'source-over';
+        });
+
+        // Floating YOU / CPU indicators above the 3D robots
+        view.bots.forEach((bs, i) => {
+          if (bs.out) return;
+          const p = projectArena3D(s3, bs.x, 0.52 + Math.max(0, bs.air) * 0.85, bs.y);
+          if (p.behind) return;
+          g.font = '800 14px "JetBrains Mono", monospace'; g.textAlign = 'center';
+          g.fillStyle = SIDE_COLORS[i];
+          g.beginPath(); g.moveTo(p.x - 7, p.y - 10); g.lineTo(p.x + 7, p.y - 10); g.lineTo(p.x, p.y); g.closePath(); g.fill();
+          g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.88)';
+          const tag = i ? `CPU · ${m.bots[i].spec.name}` : `YOU · ${m.bots[i].spec.name}`;
+          g.strokeText(tag, p.x, p.y - 15); g.fillText(tag, p.x, p.y - 15);
+          if (bs.count > 0.5 && !bs.ko) {
+            g.font = '900 54px Inter, sans-serif'; g.lineWidth = 8; g.fillStyle = '#ff3b30';
+            g.strokeText(String(Math.min(C.KO_COUNT, Math.ceil(bs.count))), p.x, p.y + 42); g.fillText(String(Math.min(C.KO_COUNT, Math.ceil(bs.count))), p.x, p.y + 42);
+          }
+        });
+        return;
+      }
+
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
       g.drawImage(ui.floor, 0, 0);
@@ -1608,10 +1964,36 @@
         ['TECH CHECK', sa.legal ? 'PASSED' : 'FAILS CHECKS', sb.legal ? 'PASSED' : 'FAILS CHECKS', 0, 0],
       ].map(([label, ta, tb, na, nb]) => `<div class="bba-tape-row"><b class="${na > nb ? 'win' : ''}">${esc(ta)}</b><span>${label}</span><b class="${nb > na ? 'win' : ''}">${esc(tb)}</b></div>`).join('');
     }
-    // a still portrait of a bot, nose up, for the pre-match card
-    function portrait(canvas, spec) {
+    // Render a true 3D beauty portrait of each bot for the Tale of the Tape card (with 2D fallback)
+    function portrait(canvas, spec, buildObj) {
       const g = canvas.getContext('2d');
       g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, canvas.width, canvas.height);
+      const E = root.BBEngine, Mdl = root.BBModels;
+      if (E && Mdl && buildObj) {
+        try {
+          const THREE = E.THREE;
+          const pScn = new THREE.Scene();
+          if (E.scene && E.scene.environment) pScn.environment = E.scene.environment;
+          pScn.add(new THREE.HemisphereLight('#dce8ff', '#161820', 0.78));
+          const kl = new THREE.DirectionalLight('#fff6e5', 1.85); kl.position.set(-4, 7, 5); pScn.add(kl);
+          const fl = new THREE.DirectionalLight('#6eb4ff', 0.78); fl.position.set(5, 4, 4); pScn.add(fl);
+          const rl = new THREE.DirectionalLight('#ff6a2b', 0.98); rl.position.set(2, 4, -6); pScn.add(rl);
+          const botM = Mdl.buildBot(buildObj);
+          pScn.add(botM.root);
+          const reach = spec.weapons.reduce((r, w) => Math.max(r, Math.min(w.reach || 0, spec.radius + 0.55)), spec.radius);
+          const rad = Math.max(0.62, reach) * (Mdl.SCALE || 2);
+          const pCam = new THREE.PerspectiveCamera(26, STAGE_W / STAGE_H, 0.1, 50);
+          pCam.position.set(-rad * 1.95, rad * 1.45, rad * 2.35);
+          pCam.lookAt(0, rad * 0.12, rad * 0.12);
+          pCam.updateMatrixWorld(true);
+          if (E.invalidate) E.invalidate();
+          E.renderer.render(pScn, pCam);
+          const sw = E.canvas.width, sh = E.canvas.height, side = Math.min(sw, sh) * 0.88;
+          g.drawImage(E.canvas, (sw - side) / 2, (sh - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+          Mdl.disposeBot(botM);
+          return;
+        } catch (err) { /* fallback to 2D below */ }
+      }
       const reach = spec.weapons.reduce((r, w) => Math.max(r, Math.min(w.reach, spec.radius + 0.6)), spec.radius);
       const still = { th: -Math.PI / 2, body: 0, air: 0, inv: false, speed: 0, slow: 0, stun: 0, hp: [1, 1, 1, 1, 1], w: spec.weapons.map(() => ({ spin: 0, on: true, anim: 0, act: 0, ang: 0.6, cd: 1, dead: false })) };
       drawBot(g, spec, still, 0, canvas.width / 2, canvas.height / 2 + 6, (canvas.width * 0.46) / reach);
@@ -1619,7 +2001,7 @@
 
     function showPre() {
       ui.screen = 'pre';
-      const me = { spec: C.botSpec(ui.opts.build) }, opp = ui.opps.find((o) => o.id === ui.oppId) || ui.opps[0];
+      const me = { spec: C.botSpec(ui.opts.build), build: ui.opts.build }, opp = ui.opps.find((o) => o.id === ui.oppId) || ui.opps[0];
       ui.oppId = opp ? opp.id : null;
       const k = me.spec.k;
       ui.layer.innerHTML = `
@@ -1629,21 +2011,22 @@
           </div>
           <div class="bba-panel bba-setup"><div class="bba-h"><i></i>02 · MATCH SETUP</div>
             <div class="bba-label">AI DRIVER</div>${seg('diff', Object.keys(C.LEVELS).map((v) => [v, C.LEVELS[v].name]), ui.diff)}
+            <div class="bba-label">ARENA CAMERA VIEW</div>${seg('cammode', [['broadcast', '3D BROADCAST'], ['chase', '3D CHASE CAM'], ['top3d', '3D OVERHEAD'], ['2d', '2D TACTICAL']], ui.camMode)}
             <div class="bba-label">ARENA HAZARDS</div><div class="bba-seg wrap">${HAZARDS.map(([v, label]) => `<button class="bba-btn${ui.hazards[v] ? ' on' : ''}" data-act="hazard" data-v="${v}">${label}</button>`).join('')}</div>
             <div class="bba-label">DRIVING</div>${seg('drive', [['keys', 'KEYBOARD'], ['mouse', 'MOUSE: FOLLOW POINTER']], ui.mouseDrive ? 'mouse' : 'keys')}
             <div class="bba-seg"><button class="bba-btn${ui.autoFire ? ' on' : ''}" data-act="autofire">AUTO-FIRE WEAPONS</button><button class="bba-btn${ui.autopilot ? ' on' : ''}" data-act="autopilot">AUTOPILOT (WATCH)</button></div>
-            <div class="bba-legend"><b>W A S D</b> · DRIVE${me.spec.strafe ? ' &nbsp; <b>Q E</b> · STRAFE' : ''}<br><b>SPACE</b> · FIRE${keyPlan(me.spec).multi ? ' THE ' + (keyPlan(me.spec).alone || 'main').toUpperCase() + ' WEAPON<br><b>SPACE + ARROW</b> · FIRE THAT SIDE: <b>↑</b> FRONT &nbsp; <b>↓</b> REAR &nbsp; <b>←</b> LEFT &nbsp; <b>→</b> RIGHT' : ' THE WEAPON'}<br><b>M</b> · MOUSE DRIVE &nbsp; <b>F</b> · AUTO-FIRE &nbsp; <b>P</b> · PAUSE<br>MOUSE DRIVE: THE BOT CHASES THE POINTER, HOLD THE BUTTON TO FIRE</div>
+            <div class="bba-legend"><b>W A S D</b> · DRIVE${me.spec.strafe ? ' &nbsp; <b>Q E</b> · STRAFE' : ''}<br><b>SPACE</b> · FIRE${keyPlan(me.spec).multi ? ' THE ' + (keyPlan(me.spec).alone || 'main').toUpperCase() + ' WEAPON<br><b>SPACE + ARROW</b> · FIRE THAT SIDE: <b>↑</b> FRONT &nbsp; <b>↓</b> REAR &nbsp; <b>←</b> LEFT &nbsp; <b>→</b> RIGHT' : ' THE WEAPON'}<br><b>M</b> · MOUSE DRIVE &nbsp; <b>F</b> · AUTO-FIRE &nbsp; <b>P</b> · PAUSE</div>
             <div class="bba-rules">${clock(C.MATCH_S)} MATCH · ${C.KO_COUNT} S COUNT-OUT · 3 JUDGES: DAMAGE 5 · AGGRESSION 3 · CONTROL 3</div>
             <button class="bba-start" data-act="start"${opp ? '' : ' disabled'}>START MATCH</button>
           </div>
           <div class="bba-panel bba-tape"><div class="bba-h"><i></i>03 · TALE OF THE TAPE · ${esc(me.spec.className)}</div>
             <div class="bba-vs"><div><canvas width="230" height="230" data-pt="0"></canvas><b style="color:${SIDE_COLORS[0]}">${esc(me.spec.name)}</b><span>YOU</span></div><em>VS</em><div><canvas width="230" height="230" data-pt="1"></canvas><b style="color:${SIDE_COLORS[1]}">${esc(opp ? opp.spec.name : '—')}</b><span>${opp ? C.LEVELS[ui.diff].name + ' AI' : ''}</span></div></div>
             ${opp ? tapeRows(me, opp) : ''}
-            <div class="bba-note">${scaled('ARENA 10 M SQUARE', k)} · STEEL FLOOR · OPPONENT BUILT TO YOUR WEIGHT CLASS</div>
+            <div class="bba-note">${scaled('ARENA 10 M SQUARE', k)} · 3D BATTLEBOX · OPPONENT BUILT TO YOUR WEIGHT CLASS</div>
           </div>
         </div>`;
-      portrait(ui.layer.querySelector('[data-pt="0"]'), me.spec);
-      if (opp) portrait(ui.layer.querySelector('[data-pt="1"]'), opp.spec);
+      portrait(ui.layer.querySelector('[data-pt="0"]'), me.spec, me.build);
+      if (opp) portrait(ui.layer.querySelector('[data-pt="1"]'), opp.spec, opp.build);
     }
 
     function botPanel(i, spec) {
@@ -1656,7 +2039,7 @@
         <div class="bba-chips"><span id="bba-dl${i}">LEFT</span><span id="bba-dr${i}">RIGHT</span><span id="bba-bt${i}">BATTERY</span></div>
         <div class="bba-label">WEAPONS</div>
         ${spec.weapons.map((w, j) => `<button class="bba-weapon" data-act="weapon" data-bot="${i}" data-v="${w.slot}"${i ? ' disabled' : ''}><span>${w.slot.toUpperCase()}${!i && keyPlan(spec).hint(w) ? ` · <kbd>${keyPlan(spec).hint(w)}</kbd>` : ''}</span><b>${esc(w.name)}</b><i><u id="bba-wb${i}${j}"></u></i><em id="bba-wv${i}${j}"></em></button>`).join('') || '<div class="bba-note">NO MODULES FITTED</div>'}
-        ${i ? '<div class="bba-label">AI</div><div class="bba-ai" id="bba-ai">—</div>' : `
+        ${i ? '<div class="bba-label">AI</div><div class="bba-ai" id="bba-ai">—</div><div class="bba-label">CAMERA VIEW</div><div class="bba-seg wrap">' + [['broadcast', '3D TV'], ['chase', 'CHASE'], ['top3d', 'TOP 3D'], ['2d', '2D MAP']].map(([v, l]) => `<button class="bba-btn${ui.camMode === v ? ' on' : ''}" data-act="cammode" data-v="${v}">${l}</button>`).join('') + '</div>' : `
         <div class="bba-label">DRIVE PAD</div>
         <div class="bba-pad">${[['fl', '&#8598;'], ['f', '&#9650;'], ['fr', '&#8599;'], ['l', '&#9664;'], ['fire', 'FIRE'], ['r', '&#9654;'], ['bl', '&#8601;'], ['b', '&#9660;'], ['br', '&#8600;']].map(([v, s]) => `<button class="bba-btn${v === 'fire' ? ' hot' : ''}" data-pad="${v}">${s}</button>`).join('')}</div>
         <div class="bba-seg"><button class="bba-btn" data-act="mousedrive" id="bba-md">MOUSE DRIVE</button><button class="bba-btn" data-act="autofire" id="bba-af">AUTO-FIRE</button></div>`}
@@ -1669,6 +2052,9 @@
       if (!opp) return;
       ui.seed = (ui.seed * 1103515245 + 12345) & 0x7fffffff;
       ui.match = C.createMatch(ui.opts.build, opp.build, { seed: ui.seed, difficulty: ui.diff, hazards: ui.hazards });
+      ui.match.bots[0].build = ui.opts.build;
+      ui.match.bots[1].build = opp.build;
+      syncArenaBots3D(ui.opts.build, opp.build);
       ui.floor = buildFloor(ui.match.hz);
       ui.decalCtx.clearRect(0, 0, AS, AS); ui.decalIdx = 0; ui.decalT = 0;
       ui.screen = 'match'; ui.paused = false; ui.acc = 0; ui.endWait = 0; ui.ticker = 0; ui.keys.clear(); ui.pad = {}; ui.held = {};
@@ -1847,6 +2233,12 @@
       if (act === 'pause') return togglePause();
       if (act === 'opp') { ui.oppId = v; return showPre(); }
       if (act === 'diff') { ui.diff = v; return showPre(); }
+      if (act === 'cammode') {
+        ui.camMode = v || 'broadcast';
+        if (ui.screen === 'pre') return showPre();
+        ui.root.querySelectorAll('[data-act="cammode"]').forEach((q) => q.classList.toggle('on', q.dataset.v === ui.camMode));
+        return undefined;
+      }
       if (act === 'hazard') { ui.hazards[v] = !ui.hazards[v]; return showPre(); }
       if (act === 'drive') { ui.mouseDrive = v === 'mouse'; return showPre(); }
       if (act === 'autopilot') { ui.autopilot = !ui.autopilot; return showPre(); }
@@ -1878,8 +2270,20 @@
       ui.lastTs = ts; ui.frameNo++;
       const m = ui.match;
       if (ui.screen === 'pre' || !m) {
-        // an empty, lit arena behind the pre-match card
-        ui.ctx.setTransform(1, 0, 0, 1, 0, 0); ui.ctx.drawImage(ui.floor, 0, 0); ui.ctx.drawImage(ui.light, AX, AY);
+        // Render the 3D BattleBox behind the pre-match lobby card
+        const E = root.BBEngine, s3 = ensureArena3D();
+        if (s3 && E && E.renderer) {
+          const ang = (ts * 0.00025) % TAU;
+          s3.cam.position.set(Math.sin(ang) * 14.5, 9.8, Math.cos(ang) * 14.5);
+          s3.cam.lookAt(0, 0.4, 0);
+          s3.cam.updateMatrixWorld(true);
+          if (E.invalidate) E.invalidate();
+          E.renderer.render(s3.scn, s3.cam);
+          ui.ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ui.ctx.drawImage(E.canvas, 0, 0, STAGE_W, STAGE_H);
+        } else {
+          ui.ctx.setTransform(1, 0, 0, 1, 0, 0); ui.ctx.drawImage(ui.floor, 0, 0); ui.ctx.drawImage(ui.light, AX, AY);
+        }
         return;
       }
       let view, t;
@@ -1915,25 +2319,25 @@
       open(opts) {
         if (ui) api.close();
         if (!opts || !opts.build) throw new Error('BBArena.open needs { build }');
-        const root = el('bba-root'), stage = el('bba-stage'), canvas = makeCanvas(STAGE_W, STAGE_H), layer = el('bba-layer');
+        const rootEl = el('bba-root'), stage = el('bba-stage'), canvas = makeCanvas(STAGE_W, STAGE_H), layer = el('bba-layer');
         canvas.className = 'bba-canvas';
         stage.appendChild(canvas); stage.appendChild(layer);
         stage.appendChild(el('bba-corner', '<button class="bba-btn" data-act="pause">PAUSE</button><button class="bba-btn hot" data-act="exit">EXIT ARENA</button>'));
-        root.appendChild(stage); document.body.appendChild(root);
+        rootEl.appendChild(stage); document.body.appendChild(rootEl);
         const decals = makeCanvas(AS, AS);
         ui = {
-          opts, root, stage, canvas, layer, ctx: canvas.getContext('2d'), decals, decalCtx: decals.getContext('2d'), decalIdx: 0, decalT: 0,
-          floor: null, light: buildLight(), screen: 'pre', match: null, opps: [], oppId: null, diff: 'veteran',
+          opts, root: rootEl, stage, canvas, layer, ctx: canvas.getContext('2d'), decals, decalCtx: decals.getContext('2d'), decalIdx: 0, decalT: 0,
+          floor: null, light: buildLight(), screen: 'pre', match: null, opps: [], oppId: null, diff: 'veteran', camMode: 'broadcast', scn3d: null,
           hazards: { saws: true, pulverizer: true, screws: true, flames: true, pit: true },
           keys: new Set(), pad: {}, held: {}, mouse: { x: 0, y: 0, inside: false, down: false }, mouseDrive: false, autoFire: false, autopilot: false,
           paused: false, acc: 0, endWait: 0, lastTs: 0, frameNo: 0, raf: 0, rp: null, seed: (Date.now() & 0x7fffffff) || 1,
         };
         ui.floor = buildFloor({ saws: [], flames: [], pulv: null, screws: null, pit: null });
         ui.opps = opponentList();
-        root.addEventListener('click', onClick);
-        root.addEventListener('input', onSeek);
-        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) root.addEventListener(type, onPointer);
-        root.addEventListener('contextmenu', (e) => e.preventDefault());
+        rootEl.addEventListener('click', onClick);
+        rootEl.addEventListener('input', onSeek);
+        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) rootEl.addEventListener(type, onPointer);
+        rootEl.addEventListener('contextmenu', (e) => e.preventDefault());
         window.addEventListener('keydown', onKey, true); window.addEventListener('keyup', onKey, true);
         window.addEventListener('resize', fit);
         fit(); showPre();
@@ -1942,6 +2346,10 @@
       close() {
         if (!ui) return;
         cancelAnimationFrame(ui.raf);
+        if (ui.scn3d && root.BBModels) {
+          ui.scn3d.bots3d.forEach((b) => { if (b) root.BBModels.disposeBot(b); });
+        }
+        if (root.BBEngine && root.BBEngine.invalidate) root.BBEngine.invalidate();
         window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKey, true);
         window.removeEventListener('resize', fit);
         ui.root.remove();

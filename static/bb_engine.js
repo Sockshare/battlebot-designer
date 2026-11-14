@@ -517,10 +517,14 @@
       const probe = document.createElement('canvas');
       const gl = probe.getContext('webgl2') || probe.getContext('webgl') || probe.getContext('experimental-webgl');
       if (gl) {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'default' });
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
         renderer.setClearColor(0x000000, 0);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        if (THREE.ACESFilmicToneMapping !== undefined) {
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.18;
+        }
       }
     } catch (e) {
       renderer = null;
@@ -536,34 +540,43 @@
   const camera = new THREE.PerspectiveCamera(28, W / H, 0.1, 120);
   const toHex = (c) => new THREE.Color(c[0], c[1], c[2]);
 
-  scene.add(new THREE.HemisphereLight('#c9d2e6', '#1a1c20', 0.42));
-  const keyLight = new THREE.DirectionalLight(toHex(C_KEY), 1.25);
+  scene.add(new THREE.HemisphereLight('#d6e2ff', '#16181e', 0.58));
+  const keyLight = new THREE.DirectionalLight(toHex(C_KEY), 1.65);
   keyLight.position.set(L_KEY[0] * 9, L_KEY[1] * 9, L_KEY[2] * 9);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
   Object.assign(keyLight.shadow.camera, { left: -3.2, right: 3.2, top: 3.2, bottom: -3.2, near: 1, far: 20 });
-  keyLight.shadow.bias = -0.0015;
+  keyLight.shadow.bias = -0.0012;
   scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(toHex(C_FILL), 0.4);
+  const fillLight = new THREE.DirectionalLight(toHex(C_FILL), 0.62);
   fillLight.position.set(L_FILL[0] * 8, L_FILL[1] * 8, L_FILL[2] * 8);
   scene.add(fillLight);
-  const rimLight = new THREE.DirectionalLight(toHex(C_RIM), 0.6);
+  const rimLight = new THREE.DirectionalLight(toHex(C_RIM), 0.88);
   rimLight.position.set(L_RIM[0] * 8, L_RIM[1] * 8, L_RIM[2] * 8);
   scene.add(rimLight);
+  const underLight = new THREE.DirectionalLight('#4a6fa5', 0.28);
+  underLight.position.set(0, -6, 3);
+  scene.add(underLight);
 
   if (!isSoftware) {
-    // small emissive "studio" for reflections on the WebGL path
+    // High-contrast broadcast BattleBox light-rig studio environment for realistic metallic reflections
     try {
       const envScene = new THREE.Scene();
       const box = (w, h, d, x, y, z, color) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })); m.position.set(x, y, z); envScene.add(m); };
-      box(40, 40, 40, 0, 0, 0, '#0b0c0f');
-      box(12, 0.2, 12, 0, 9, 0, '#ffffff');
-      box(0.2, 5, 9, -10, 5, 4, '#fff1dc');
-      box(0.2, 4, 8, 10, 4, 3, '#7ea6ff');
-      box(8, 3, 0.2, 3, 4, -10, '#ff8a4a');
-      box(40, 0.2, 40, 0, -3, 0, '#16181c');
+      box(44, 44, 44, 0, 0, 0, '#090b0f');
+      // Overhead BattleBox truss softboxes & stadium spot strips
+      box(14, 0.25, 14, 0, 10, 0, '#ffffff');
+      box(18, 0.2, 1.4, 0, 9.5, -5.5, '#fff6e6');
+      box(18, 0.2, 1.4, 0, 9.5, 5.5, '#e6f0ff');
+      // Warm key wall + cool cyan broadcast fill + fiery orange BattleBox rim
+      box(0.25, 6.5, 11, -11, 5.2, 4, '#fff2de');
+      box(0.25, 5.5, 10, 11, 4.5, 3, '#72b0ff');
+      box(10, 4.2, 0.25, 3, 4.5, -11, '#ff7733');
+      box(10, 3.2, 0.25, -4, 3.5, 11, '#ff481f');
+      // Brushed steel floor bounce
+      box(44, 0.2, 44, 0, -3.2, 0, '#1e222a');
       const pmrem = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(envScene, 0.03).texture;
+      scene.environment = pmrem.fromScene(envScene, 0.025).texture;
       pmrem.dispose();
     } catch (e) { /* environment is optional */ }
   }

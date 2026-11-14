@@ -706,24 +706,40 @@
     // ---- top plate ----
     const gt = ctx.g.top;
     const topOutline = lay.shape === 'tube' ? inset(outline, 0.97) : outline.map((p) => [p[0] + Math.sign(p[0]) * tS * 0.5, p[1] + Math.sign(p[1]) * tS * 0.5]);
-    put(ctx, at(plateXZ(topOutline, tT, Math.min(0.002, tT * 0.3), wheelSlots(lay, wheel, topY + tT / 2, 0.012)), 0, topY + tT / 2, 0), [M.faces.top.armor, M.faces.top.edge], gt, 'armor_top', 'armor');
+    put(ctx, at(plateXZ(topOutline, tT, Math.min(0.0025, tT * 0.35), wheelSlots(lay, wheel, topY + tT / 2, 0.012)), 0, topY + tT / 2, 0), [M.faces.top.armor, M.faces.top.edge], gt, 'armor_top', 'armor');
     ctx.anchors.armor_top = gt;
     const yT = topY + tT;
     const tb = (ctx.topBolts || []).slice();
-    if (wheeled) for (const s of [-1, 1]) for (const z of linspace(-L / 2 + 0.05, L / 2 - 0.05, Math.max(3, Math.round(L / 0.13)))) { if (!lay.cut || Math.abs(z) < L / 2 - lay.cut - 0.02) tb.push([s * xi, yT, z]); }
-    if (tb.length) K.bolts(ctx, gt, 'armor_top', tb, 'y', 0.0056, M.bolt, 'armor');
-    // battery hatch outline, vents, stripes, number
+    if (wheeled) for (const s of [-1, 1]) for (const z of linspace(-L / 2 + 0.05, L / 2 - 0.05, Math.max(3, Math.round(L / 0.11)))) { if (!lay.cut || Math.abs(z) < L / 2 - lay.cut - 0.02) tb.push([s * xi, yT, z]); }
+    if (tb.length) K.bolts(ctx, gt, 'armor_top', tb, 'y', 0.0058, M.boltZinc, 'armor');
+    // battery hatch outline, CNC chamfered vents, anodized tie-downs, telemetry LED bars, stripes, number
     const pk = lay.packs, pz = pk[0].z, pw = Math.min(lay.bodyHalfW * 1.5, pk.length * (lay.pack.w + 0.012) + 0.05), pl = Math.min(lay.pack.len + 0.05, L * 0.42);
-    const dark = [], dec = [], hb = [];
-    const lw = 0.004, ye = yT + 0.0004;
-    dark.push(at(box(pw, 0.0005, lw), 0, ye, pz - pl / 2), at(box(pw, 0.0005, lw), 0, ye, pz + pl / 2), at(box(lw, 0.0005, pl), -pw / 2, ye, pz), at(box(lw, 0.0005, pl), pw / 2, ye, pz));
+    const dark = [], dec = [], hb = [], trimSteel = [];
+    const lw = 0.004, ye = yT + 0.0005;
+    dark.push(at(box(pw, 0.0006, lw), 0, ye, pz - pl / 2), at(box(pw, 0.0006, lw), 0, ye, pz + pl / 2), at(box(lw, 0.0006, pl), -pw / 2, ye, pz), at(box(lw, 0.0006, pl), pw / 2, ye, pz));
     for (const sx of [-1, 1]) for (const z of [-0.42, 0, 0.42]) hb.push([sx * (pw / 2 - 0.014), yT, pz + z * pl]);
     const zTopMax = L / 2 - lay.notch.f, delta = lay.taper < 1;
     const vz = Math.min(zTopMax - 0.12, pz + pl / 2 + 0.07);
-    for (const x of linspace(-0.07, 0.07, 6)) dark.push(at(box(0.012, 0.0005, 0.06), x, ye, vz));
+    for (const x of linspace(-0.075, 0.075, 7)) dark.push(at(box(0.011, 0.0008, 0.064), x, ye, vz));
+    // Twin CNC fan-exhaust louver banks + billet hoist D-rings + glowing status LED strips on the deck
+    if (!delta && lay.shape !== 'tube' && lay.bodyHalfW > 0.18) {
+      const lx = Math.min(lay.bodyHalfW * 0.66, pw / 2 + 0.065);
+      for (const sx of [-1, 1]) {
+        for (const zOff of [-0.045, -0.022, 0, 0.022, 0.045]) {
+          dark.push(at(box(0.032, 0.0007, 0.008), sx * lx, ye, pz + zOff));
+        }
+        trimSteel.push(at(box(0.016, 0.012, 0.036), sx * (pw / 2 - 0.024), yT + 0.005, pz - pl * 0.34));
+      }
+      put(ctx, merge(trimSteel), M.steel, gt, 'armor_top', 'armor');
+      const ledBars = [
+        at(box(0.036, 0.003, 0.008), -pw * 0.32, yT + 0.002, pz + pl / 2 - 0.016),
+        at(box(0.036, 0.003, 0.008), pw * 0.32, yT + 0.002, pz + pl / 2 - 0.016),
+      ];
+      put(ctx, merge(ledBars), M.led, gt, 'armor_top', 'elec');
+    }
     const lit = /^#[d-f]/i.test(M.lv.top) && !M.lv.bare;
     put(ctx, merge(dark), lit ? M.decalDark : M.gouge, gt, 'armor_top', 'decal');
-    K.bolts(ctx, gt, 'armor_top', hb, 'y', 0.0045, M.boltZinc, 'armor');
+    K.bolts(ctx, gt, 'armor_top', hb, 'y', 0.0048, M.boltZinc, 'armor');
     if (!M.lv.bare || cfg.finish !== 'factory') {
       const sw = Math.min(0.05, lay.bodyHalfW * 0.16);
       let sx0 = Math.min(lay.bodyHalfW - 0.08, pw / 2 + 0.05);
@@ -731,10 +747,10 @@
       if (lay.notch.f || lay.notch.r) sx0 = Math.max(sx0, lay.notch.half + sw / 2 + 0.012);
       if (delta) sx0 = Math.min(sx0, lay.bodyHalfW * 0.5);
       const sl = delta ? L * 0.42 : (lay.cut ? L - 2 * lay.cut : L) * 0.9;
-      for (const s of [-1, 1]) dec.push(at(box(sw, 0.0005, sl), s * sx0, ye, delta ? -L * 0.24 : 0));
+      for (const s of [-1, 1]) dec.push(at(box(sw, 0.0006, sl), s * sx0, ye, delta ? -L * 0.24 : 0));
       const nh = Math.min(0.11, lay.bodyHalfW * 0.36);
-      for (const q of digitGeos(unitNumber(cfg.name), nh, 0.0005)) dec.push(at(q, 0, ye, Math.min(Math.max(vz + 0.09 + nh / 2, L * 0.2), zTopMax - nh / 2 - 0.03), -Math.PI / 2));
-      if (cfg.text) { const th = Math.min(0.045, ((pw - 0.04) * 7) / (6 * cfg.text.length)); for (const q of K.textGeos(cfg.text, th, 0.0005)) dec.push(at(q, 0, ye, pz, -Math.PI / 2)); }
+      for (const q of digitGeos(unitNumber(cfg.name), nh, 0.0006)) dec.push(at(q, 0, ye, Math.min(Math.max(vz + 0.09 + nh / 2, L * 0.2), zTopMax - nh / 2 - 0.03), -Math.PI / 2));
+      if (cfg.text) { const th = Math.min(0.045, ((pw - 0.04) * 7) / (6 * cfg.text.length)); for (const q of K.textGeos(cfg.text, th, 0.0006)) dec.push(at(q, 0, ye, pz, -Math.PI / 2)); }
       put(ctx, merge(dec), M.decalTop, gt, 'armor_top', 'decal');
     }
     // wear on the deck (authored in x-y then laid flat)
